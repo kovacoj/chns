@@ -281,7 +281,7 @@ class CahnHilliardNavierStokes:
             self.density(phi)*fd.inner(fd.dot(u, fd.nabla_grad(u)), v)
             + self.viscosity(phi)*fd.inner(fd.grad(u), fd.grad(v))
             - self.density(phi)*fd.dot(self.gravity, v)
-            - p*fd.div(v) - phi*mu*fd.div(v)
+            - phi*fd.inner(fd.grad(mu), v) - p*fd.div(v)
         )
 
         phase = lambda u, p, phi, mu: (
