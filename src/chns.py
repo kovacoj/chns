@@ -28,7 +28,7 @@ class CahnHilliardNavierStokes:
         self.output_every = output_every
 
         self.file = fd.VTKFile(f"output/chns-{benchmark}.pvd")
-        self.theta = 1.0
+        self.theta = 1.0  # Backward Euler default for the canonical benchmark.
 
         self.rho1, self.rho2 = 10, 1
         self.nu1 = self.nu2 = 1 # paper says should be the same
@@ -364,13 +364,6 @@ class CahnHilliardNavierStokes:
                 pbar.set_postfix_str(
                     f"t={t:.2e} phi=[{diagnostics['phi_min']:.2e}, {diagnostics['phi_max']:.2e}] com_y={diagnostics['com_y']:.2e}"
                 )
-<<<<<<< HEAD
-
-        return history
-
-=======
->>>>>>> c7d401a (feat(chns): add bubble benchmarks and diagnostics)
-
         return history
 if __name__ == '__main__':
     model = CahnHilliardNavierStokes(

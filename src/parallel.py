@@ -11,7 +11,7 @@ from functools import cached_property
 class CahnHilliardNavierStokes:
     def __init__(self):
         self.file = VTKFile("output/parallel.pvd", "w")
-        self.theta = 0.5  # Crank-Nicolson
+        self.theta = 1.0  # Backward Euler while the CHNS formulation is still being stabilized.
 
         # Physical parameters
         self.rho1, self.rho2 = 1000.0, 1100.0  # kg/m^3
