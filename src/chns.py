@@ -364,10 +364,14 @@ class CahnHilliardNavierStokes:
                 pbar.set_postfix_str(
                     f"t={t:.2e} phi=[{diagnostics['phi_min']:.2e}, {diagnostics['phi_max']:.2e}] com_y={diagnostics['com_y']:.2e}"
                 )
+<<<<<<< HEAD
 
         return history
 
+=======
+>>>>>>> c7d401a (feat(chns): add bubble benchmarks and diagnostics)
 
+        return history
 if __name__ == '__main__':
     model = CahnHilliardNavierStokes(
         benchmark=CLI_ARGS.benchmark,
