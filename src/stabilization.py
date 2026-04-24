@@ -180,16 +180,15 @@ class CahnHilliardNavierStokes:
         centers = np.array([[0.4, 0.3], [0.6, 0.8]])
         radius = 0.2
 
-        initial_phase = fd.Constant(0.)
+        interface_width = 0.5 * self.epsilon
+        initial_phase = 0.0
 
         for center in centers:
             diff = [(coordinates[i] - center[i])**2 for i in range(len(coordinates))]
-            distance = fd.sqrt(sum(diff))
+            distance = fd.sqrt(sum(diff) + 1e-12)
+            bubble = 0.5 * (1.0 - fd.tanh((distance - radius) / interface_width))
 
-            initial_phase = fd.max_value(
-                initial_phase,
-                fd.conditional(distance <= radius, 1. ,0.)
-            )
+            initial_phase = 1.0 - (1.0 - initial_phase) * (1.0 - bubble)
 
         return fd.Function(self.FunctionSpace[2]).interpolate(initial_phase)
 
