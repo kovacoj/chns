@@ -11,6 +11,8 @@ import numpy as np
 from utils import refine_bary
 from functools import cached_property
 
+# Experimental stabilization variant; the canonical capillary coupling lives in
+# `src/chns.py` and this file may intentionally diverge while ideas are tested.
 
 class CahnHilliardNavierStokes:
     def __init__(self):

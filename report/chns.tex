@@ -131,7 +131,7 @@ We considered the density, viscosity, and other quantities depending on the phas
 
 Boundary conditions were chosen such that most of the terms in the weak formulation zero out, and we are left with this simplistic version
 \begin{align*}
-    &\int_{\Omega} \density \velocity_t \cdot \test{\velocity} + \int_{\Omega} \density \left(\velocity \cdot \grad{\velocity} \right) \cdot \test{\velocity} + \viscosity \grad{\velocity} \mathbf{:} \grad{\test{\velocity}} - \int_{\Omega} \density \gravity \cdot \test{\velocity} + \phase \chempot \div{\test{\velocity}} + \int_{\Omega} \test{\pressure} \div{\velocity} - \pressure \div{\test{\velocity}} \\
+    &\int_{\Omega} \density \velocity_t \cdot \test{\velocity} + \int_{\Omega} \density \left(\velocity \cdot \grad{\velocity} \right) \cdot \test{\velocity} + \viscosity \grad{\velocity} \mathbf{:} \grad{\test{\velocity}} - \int_{\Omega} \density \gravity \cdot \test{\velocity} - \int_{\Omega} \phase \grad{\chempot} \cdot \test{\velocity} + \int_{\Omega} \test{\pressure} \div{\velocity} - \pressure \div{\test{\velocity}} \\
     & + \int_{\Omega} \phase_t \test{\phase} + \int_{\Omega} \left(\velocity \cdot \grad{\phase}\right) \test{\phase} + \int_{\Omega} M \grad{\chempot} \cdot \grad{\test{\phase}} + \int_{\Omega} \chempot \test{\chempot} - \varepsilon \sigma \grad{\phase} \cdot \grad{\test{\chempot}} - \frac{\sigma}{\varepsilon} \potential'(\phase) \test{\chempot} = 0
 \end{align*}
 
