@@ -278,7 +278,7 @@ class CahnHilliardNavierStokes:
         total_time = n * dt
 
         momentum = lambda u, p, phi, mu: (
-            self.density(phi)*fd.inner(fd.dot(u, fd.nabla_grad(u)), v)
+            fd.inner(fd.div(fd.outer(self.density(phi) * u, u)), v)
             + self.viscosity(phi)*fd.inner(fd.grad(u), fd.grad(v))
             - self.density(phi)*fd.dot(self.gravity, v)
             - phi*fd.inner(fd.grad(mu), v) - p*fd.div(v)
@@ -291,7 +291,7 @@ class CahnHilliardNavierStokes:
 
         F = (
             fd.inner((phi - phi_) / dt, psi) 
-            + (self.theta*self.density(phi) + (1 - self.theta) * self.density(phi_)) * fd.inner((u - u_) / dt, v)
+            + fd.inner((self.density(phi) * u - self.density(phi_) * u_) / dt, v)
             + self.theta * momentum(u, p, phi, mu) + self.theta * phase(u, p, phi, mu)
             + (1 - self.theta) * momentum(u_, p_, phi_, mu_) + (1 - self.theta) * phase(u_, p_, phi_, mu_)
             + q * fd.div(u) + fd.inner(mu, nu) - self.epsilon*self.sigma*fd.inner(fd.grad(phi), fd.grad(nu)) - self.sigma/self.epsilon*fd.inner(self.potential_derivative(phi), nu)
@@ -364,13 +364,6 @@ class CahnHilliardNavierStokes:
                 pbar.set_postfix_str(
                     f"t={t:.2e} phi=[{diagnostics['phi_min']:.2e}, {diagnostics['phi_max']:.2e}] com_y={diagnostics['com_y']:.2e}"
                 )
-<<<<<<< HEAD
-
-        return history
-
-=======
->>>>>>> c7d401a (feat(chns): add bubble benchmarks and diagnostics)
-
         return history
 if __name__ == '__main__':
     model = CahnHilliardNavierStokes(
