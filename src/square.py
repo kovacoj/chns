@@ -194,22 +194,21 @@ class CahnHilliardNavierStokes:
 
     @cached_property
     def initial_chempot(self):
-        return fd.Function(self.FunctionSpace[3])
-        # Time evolution seems to converge only when the chemical potential is correctly initialized
-        # phi = self.initial_phase
-        # mu = fd.Function(self.FunctionSpace[3])
-        # nu = fd.TestFunction(self.FunctionSpace[3])
+        # Time evolution seems to converge only when the chemical potential is correctly initialized.
+        phi = self.initial_phase
+        mu = fd.Function(self.FunctionSpace[3])
+        nu = fd.TestFunction(self.FunctionSpace[3])
 
-        # F = (
-        #     fd.inner(mu, nu) - self.epsilon*self.sigma*fd.inner(fd.grad(phi), fd.grad(nu))
-        #      - self.sigma/self.epsilon*fd.inner(self.potential_derivative(phi), nu)
-        # ) * fd.dx
+        F = (
+            fd.inner(mu, nu) - self.epsilon*self.sigma*fd.inner(fd.grad(phi), fd.grad(nu))
+             - self.sigma/self.epsilon*fd.inner(self.potential_derivative(phi), nu)
+        ) * fd.dx
 
-        # problem = fd.NonlinearVariationalProblem(F, mu)
-        # solver = fd.NonlinearVariationalSolver(problem)
-        # solver.solve()
+        problem = fd.NonlinearVariationalProblem(F, mu)
+        solver = fd.NonlinearVariationalSolver(problem)
+        solver.solve()
 
-        # return mu
+        return mu
 
     def initialize(self, *functions):
         initial_conditions = {
