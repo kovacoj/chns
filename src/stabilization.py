@@ -99,7 +99,8 @@ class CahnHilliardNavierStokes:
 
     @cached_property
     def FunctionSpace(self):
-        # Scott-Vogelius pressure-robust
+        # Experimental Taylor-Hood-like variant with an extra scalar
+        # pressure-stabilization field.
         k = 2
         V = fd.VectorFunctionSpace(self.mesh, "CG", k)  # Velocity
         P = fd.FunctionSpace(self.mesh, "CG", k-1)      # Pressure
@@ -266,7 +267,8 @@ class CahnHilliardNavierStokes:
             + q * fd.div(u) + fd.inner(mu, nu) - self.epsilon*self.sigma*fd.inner(fd.grad(phi), fd.grad(nu)) - self.sigma/self.epsilon*fd.inner(self.potential_derivative(phi), nu)
         ) * fd.dx
 
-        # possibly not needed since using pressure-robust method
+        # Old stabilization notes kept for reference while comparing
+        # alternative incompressibility treatments.
         # R space does not even work with this setting, so....
         F += (p * s + r * q) * fd.dx # pressure stabilization
 
