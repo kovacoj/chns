@@ -1,7 +1,7 @@
 
 # Self-propelled droplet
 
-Possibly a simulation of a self-propelling droplet governed by the Cahn-Hilliard-Navier-Stokes equations on a torus, i.e. a two-dimensional structure. To conform with the CHNS equations, we shall use the Scott-Vogelius pair, with some adaptive mesh refinement. The droplet will be self-propelled by a gradient in the chemical potential, which will be implemented as a source term in the Navier-Stokes equations. The droplet will be confined to a torus, which will be implemented either as a periodic boundary condition or as a three-dimensional object.
+This repo contains Firedrake experiments for Cahn-Hilliard and Cahn-Hilliard-Navier-Stokes simulations. The current canonical CHNS benchmark lives in `src/chns.py` and uses a Taylor-Hood velocity-pressure pair on a rectangle for rising-bubble studies. Other solver files explore pressure-robust, barycentrically refined, parallel, and many-bubble variants.
 
 <p align="center">
   <img width="45%" src="https://github.com/jk-dot/chns/blob/main/report/graphics/bublina.gif" alt="bublina">
@@ -11,4 +11,4 @@ Possibly a simulation of a self-propelling droplet governed by the Cahn-Hilliard
 
 # TODO
 - [ ] error estimation and mesh adaptivity
-- [x] pressure-robust methods
+- [ ] pressure-robust discretization study

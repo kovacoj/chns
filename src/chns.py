@@ -297,7 +297,8 @@ class CahnHilliardNavierStokes:
             + q * fd.div(u) + fd.inner(mu, nu) - self.epsilon*self.sigma*fd.inner(fd.grad(phi), fd.grad(nu)) - self.sigma/self.epsilon*fd.inner(self.potential_derivative(phi), nu)
         ) * fd.dx() # fd.dx(degree=6)
 
-        # possibly not needed since using pressure-robust method
+        # Old stabilization notes kept for reference while comparing
+        # alternative incompressibility treatments.
         # R space does not even work with this setting, so....
         # F += (p * s + r * q) * fd.dx # pressure stabilization
         # F += 0.1 * fd.div(u) * fd.div(v) * fd.dx # stabilization ?
@@ -364,13 +365,6 @@ class CahnHilliardNavierStokes:
                 pbar.set_postfix_str(
                     f"t={t:.2e} phi=[{diagnostics['phi_min']:.2e}, {diagnostics['phi_max']:.2e}] com_y={diagnostics['com_y']:.2e}"
                 )
-<<<<<<< HEAD
-
-        return history
-
-=======
->>>>>>> c7d401a (feat(chns): add bubble benchmarks and diagnostics)
-
         return history
 if __name__ == '__main__':
     model = CahnHilliardNavierStokes(

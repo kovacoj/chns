@@ -80,7 +80,7 @@ class CahnHilliardNavierStokes:
 
     @cached_property
     def FunctionSpace(self):
-        # Scott-Vogelius pressure-robust
+        # Experimental DG-pressure variant; this is not the canonical solver.
         k = 2
         V = fd.VectorFunctionSpace(self.mesh, "CG", k)  # Velocity
         P = fd.FunctionSpace(self.mesh, "DG", k-1)      # Pressure
