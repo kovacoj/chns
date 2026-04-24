@@ -1,24 +1,41 @@
-from tqdm import tqdm, TqdmWarning
-import firedrake as fd
-from firedrake.utility_meshes import PeriodicRectangleMesh, RectangleMesh
-from firedrake.output import VTKFile
-import numpy as np
+import argparse
+import sys
 
-from utils import refine_bary
+CLI_PARSER = argparse.ArgumentParser(description="Run the canonical CHNS rising-bubble benchmark.")
+CLI_PARSER.add_argument("--benchmark", choices=("single_bubble", "two_bubbles"), default="single_bubble")
+CLI_PARSER.add_argument("--nx", type=int, default=20)
+CLI_PARSER.add_argument("--ny", type=int, default=60)
+CLI_PARSER.add_argument("--dt", type=float, default=1e-3)
+CLI_PARSER.add_argument("--steps", type=int, default=1000)
+CLI_PARSER.add_argument("--output-every", type=int, default=20)
+CLI_ARGS, REMAINING_ARGV = CLI_PARSER.parse_known_args()
+sys.argv = [sys.argv[0], *REMAINING_ARGV]
+
+from tqdm import tqdm
+import firedrake as fd
+from firedrake.utility_meshes import RectangleMesh
+from firedrake.output import VTKFile
 from functools import cached_property
 
 
 class CahnHilliardNavierStokes:
-    def __init__(self):
-        self.file = fd.VTKFile("output/chns.pvd")
-        self.theta = 0.5 # time-evolution param
+    def __init__(self, benchmark="single_bubble", nx=20, ny=60, dt=1e-3, steps=1000, output_every=20):
+        self.benchmark = benchmark
+        self.nx = nx
+        self.ny = ny
+        self.dt = dt
+        self.n_steps = steps
+        self.output_every = output_every
+
+        self.file = fd.VTKFile(f"output/chns-{benchmark}.pvd")
+        self.theta = 1.0
 
         self.rho1, self.rho2 = 10, 1
         self.nu1 = self.nu2 = 1 # paper says should be the same
         self.sigma = 1e-1
         self.gravity = fd.Constant((0., -9.81))
-        self.epsilon = 1e-1 #4 * self.cell_size
-        self.m0 = 1 # mobility factor, needs to compensate the gradient of mu :-/
+        self.epsilon = 5e-2
+        self.m0 = 1e-4
 
         self.solver_params = {
             "snes_type": "newtonls",
@@ -54,9 +71,9 @@ class CahnHilliardNavierStokes:
 
 
     def __str__(self):
-        ## TODO: ptp add domain shape & size
         return f'''
             Cahn-Hilliard Navier-Stokes Model:
+            · Benchmark = {self.benchmark}
             · Function Space {{u, p, φ, μ}} dim(W) = {self.FunctionSpace.dim()}
             · Velocity space dim(V) = {self.FunctionSpace[0].dim()}
             · Pressure space dim(P) = {self.FunctionSpace[1].dim()}
@@ -67,6 +84,7 @@ class CahnHilliardNavierStokes:
                 - Viscosity: ν₁ = {self.nu1}, ν₂ = {self.nu2}
                 - Mobility: m0 = {self.m0}
                 - σ = {self.sigma}, ε = {self.epsilon}
+                - dt = {self.dt}, steps = {self.n_steps}
             · Mesh:
                 - Cells: {self.mesh.num_cells()}
                 - Vertices: {self.mesh.num_vertices()}
@@ -84,26 +102,17 @@ class CahnHilliardNavierStokes:
 
     @cached_property
     def mesh(self):
-        Lx, Ly = 1.0, 1.0
-        nx, ny = 10, 10
-        # mesh = PeriodicRectangleMesh(nx, ny, Lx, Ly, quadrilateral=False)
-        mesh = RectangleMesh(nx, ny, Lx, Ly, quadrilateral=False)
-
-        # # barycentric refinement using Alfeld split
-        # mesh = refine_bary(mesh)
-
-        return mesh
+        return RectangleMesh(self.nx, self.ny, 1.0, 3.0, quadrilateral=False)
 
     @cached_property
     def FunctionSpace(self):
-        # Scott-Vogelius pressure-robust
+        # Taylor-Hood velocity-pressure pair with scalar CG1 phase fields.
         k = 2
         V = fd.VectorFunctionSpace(self.mesh, "CG", k)  # Velocity
-        P = fd.FunctionSpace(self.mesh, "CG", k-1)      # Pressure, DG for Alfeld
+        P = fd.FunctionSpace(self.mesh, "CG", k-1)      # Pressure
         Q = M = fd.FunctionSpace(self.mesh, "CG", k-1)  # Phase field (φ)
 
         return V * P * Q * M  # Mixed function space
-        # return fd.MixedFunctionSpace([V, P, Q, M])
 
     @staticmethod
     def potential(x):
@@ -114,8 +123,6 @@ class CahnHilliardNavierStokes:
         return 2 * x * (1 - x) * (1 - 2 * x)
 
     def density(self, phase):
-        # return self.rho1 + (self.rho2 - self.rho1) * 0.5 * (1 + fd.tanh(phase / 0.05))
-        # return self.rho1 + (self.rho2 - self.rho1) * phase
         return fd.conditional(
             phase < 0,
             self.rho1,
@@ -126,21 +133,39 @@ class CahnHilliardNavierStokes:
         )
 
     def mobility(self, phase):
-        return self.m0 * self.potential(phase) + 1e-3
+        return self.m0 * self.potential(phase) + 1e-6
 
     def viscosity(self, phase):
         return self.nu2 * phase + self.nu1 * (1.0 - phase)
    
-    def mass(self, phase):
-        return fd.assemble(self.density(phase) * fd.dx)
+    def phase_mass(self, phase):
+        return fd.assemble(phase * fd.dx)
 
-    def center_of_mass(self, phase):
-        x = fd.SpatialCoordinate(self.mesh)        
+    def phase_center_of_mass(self, phase):
+        x = fd.SpatialCoordinate(self.mesh)
+        mass = self.phase_mass(phase)
+        if abs(mass) <= 1e-12:
+            return (0.0, 0.0)
 
-        return [
-            fd.assemble(self.density(phase) * x[i] * fd.dx) / self.mass(phase)
-            for i in range(len(x))
-        ]
+        return tuple(fd.assemble(phase * x[i] * fd.dx) / mass for i in range(len(x)))
+
+    def phase_bounds(self, phase):
+        values = phase.dat.data_ro
+        return values.min(), values.max()
+
+    def divergence_metric(self, velocity):
+        return fd.assemble(fd.div(velocity) * fd.div(velocity) * fd.dx) ** 0.5
+
+    def collect_diagnostics(self, velocity, phase):
+        phi_min, phi_max = self.phase_bounds(phase)
+        _, center_y = self.phase_center_of_mass(phase)
+        return {
+            "phase_mass": self.phase_mass(phase),
+            "phi_min": phi_min,
+            "phi_max": phi_max,
+            "div_l2": self.divergence_metric(velocity),
+            "com_y": center_y,
+        }
 
     def energy(self, w):
         u, p, phi, mu = w.split()
@@ -166,31 +191,24 @@ class CahnHilliardNavierStokes:
     def initial_phase(self):
         coordinates = fd.SpatialCoordinate(self.mesh)
 
-        # mesh_coords = self.mesh.coordinates.dat.data_ro
-        # domain_size = np.ptp(mesh_coords, axis=0)
+        if self.benchmark == "single_bubble":
+            radius = 0.16
+            centers = ((0.5, 0.8),)
+        elif self.benchmark == "two_bubbles":
+            radius = 0.14
+            centers = ((0.5, 0.65), (0.5, 1.05))
+        else:
+            raise ValueError(f"Unsupported benchmark: {self.benchmark}")
 
-        # radius = 0.1
-        # n_bubbles = 42
+        interface_width = 0.5 * self.epsilon
+        initial_phase = 0.0
 
-        # adjusted_domain = domain_size - 2.5*radius
-        # centers = np.random.rand(n_bubbles, len(domain_size)) * adjusted_domain + 1.5*radius
-
-        # # centers = np.array([[0.4, 0.3], [0.6, 0.8]])
-        # # radius = 0.2
-
-        # initial_phase = fd.Constant(0.)
-
-        # for center in centers:
-        #     diff = [(coordinates[i] - center[i])**2 for i in range(len(coordinates))]
-        #     distance = fd.sqrt(sum(diff) + 1e-6)
-
-        #     initial_phase = fd.max_value(
-        #         initial_phase,
-        #         fd.conditional(distance <= radius, 1. ,0.)
-        #     )
-
-        x, y = coordinates
-        initial_phase = 0.3*fd.sin(4*fd.pi*x) * fd.sin(2*fd.pi*y) + 0.1
+        # Use a smooth diffuse interface so refinement does not turn the
+        # benchmark into a sharper and stiffer problem by construction.
+        for center_x, center_y in centers:
+            distance = fd.sqrt((coordinates[0] - center_x)**2 + (coordinates[1] - center_y)**2 + 1e-12)
+            bubble = 0.5 * (1.0 - fd.tanh((distance - radius) / interface_width))
+            initial_phase = initial_phase + bubble
 
         return fd.Function(self.FunctionSpace[2]).interpolate(initial_phase)
 
@@ -243,8 +261,8 @@ class CahnHilliardNavierStokes:
 
         v, q, psi, nu = fd.TestFunctions(self.FunctionSpace)
 
-        dt = 5e-3
-        n = 2000
+        dt = self.dt
+        n = self.n_steps
         total_time = n * dt
 
         momentum = lambda u, p, phi, mu: (
@@ -283,36 +301,66 @@ class CahnHilliardNavierStokes:
             solver_parameters=self.solver_params
         )
 
+        history = []
+        velocity_fn, _, phase_fn, _ = w.subfunctions
+        initial_diagnostics = self.collect_diagnostics(velocity_fn, phase_fn)
+        self.file.write(*w.subfunctions, time=0.0)
+        history.append({"step": 0, "time": 0.0, "iterations": 0, "reason": 0, **initial_diagnostics})
+
         with tqdm(
             total=total_time, desc="Time Evolution", unit="s", dynamic_ncols=True, bar_format="{l_bar}{bar}| {n:.0e}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]") as pbar:
             t = 0.0
 
-            for step in range(n):
+            for step in range(1, n + 1):
                 solver.solve()
                 w_.assign(w)
 
-                if step % 5 == 0:
+                t += dt
+
+                velocity_fn, _, phase_fn, _ = w.subfunctions
+                diagnostics = self.collect_diagnostics(velocity_fn, phase_fn)
+
+                if step % self.output_every == 0:
                     self.file.write(*w.subfunctions, time=t)
 
-                # Get solver convergence information
                 snes = solver.snes
                 iterations = snes.getIterationNumber()
                 converged_reason = snes.getConvergedReason()
 
-                # Check for solver convergence issues
-                if converged_reason < 0:
-                    tqdm.write(f"Warning: Solver failed to converge at step {step}, t={t:.0e} (Reason: {converged_reason})")
+                history.append({
+                    "step": step,
+                    "time": t,
+                    "iterations": iterations,
+                    "reason": converged_reason,
+                    **diagnostics,
+                })
 
-                t += dt
+                if step % self.output_every == 0 or converged_reason < 0:
+                    tqdm.write(
+                        f"step={step:04d} t={t:.3e} its={iterations:02d} "
+                        f"phi=[{diagnostics['phi_min']:.3e}, {diagnostics['phi_max']:.3e}] "
+                        f"mass={diagnostics['phase_mass']:.6f} div={diagnostics['div_l2']:.3e} "
+                        f"com_y={diagnostics['com_y']:.3e} reason={converged_reason}"
+                    )
+
+                if converged_reason < 0:
+                    break
 
                 pbar.update(dt)
-                pbar.set_postfix_str(f"t={t:.0e}")
+                pbar.set_postfix_str(
+                    f"t={t:.2e} phi=[{diagnostics['phi_min']:.2e}, {diagnostics['phi_max']:.2e}] com_y={diagnostics['com_y']:.2e}"
+                )
 
-        # maybe return something about convergence
-        # return self
-
+        return history
 if __name__ == '__main__':
-    model = CahnHilliardNavierStokes()
+    model = CahnHilliardNavierStokes(
+        benchmark=CLI_ARGS.benchmark,
+        nx=CLI_ARGS.nx,
+        ny=CLI_ARGS.ny,
+        dt=CLI_ARGS.dt,
+        steps=CLI_ARGS.steps,
+        output_every=CLI_ARGS.output_every,
+    )
 
     print(model)
 
