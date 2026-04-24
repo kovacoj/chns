@@ -114,6 +114,18 @@ class CahnHilliardNavierStokes:
 
         return V * P * Q * M  # Mixed function space
 
+    @cached_property
+    def pressure_nullspace(self):
+        return fd.MixedVectorSpaceBasis(
+            self.FunctionSpace,
+            [
+                self.FunctionSpace.sub(0),
+                fd.VectorSpaceBasis(constant=True, comm=self.mesh.comm),
+                self.FunctionSpace.sub(2),
+                self.FunctionSpace.sub(3),
+            ],
+        )
+
     @staticmethod
     def potential(x):
         return (1 - x)**2 * x**2
@@ -298,7 +310,9 @@ class CahnHilliardNavierStokes:
         problem = fd.NonlinearVariationalProblem(F, w, J=J, bcs=bcs)
         solver = fd.NonlinearVariationalSolver(
             problem,
-            solver_parameters=self.solver_params
+            solver_parameters=self.solver_params,
+            nullspace=self.pressure_nullspace,
+            transpose_nullspace=self.pressure_nullspace,
         )
 
         history = []
@@ -352,6 +366,8 @@ class CahnHilliardNavierStokes:
                 )
 
         return history
+
+
 if __name__ == '__main__':
     model = CahnHilliardNavierStokes(
         benchmark=CLI_ARGS.benchmark,
