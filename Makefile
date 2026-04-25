@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-.PHONY: clean build run run-gui run-ch run-chns run-chns-two run-parallel gif-chns gif-chns-two help
+.PHONY: clean build run run-gui run-ch run-chns run-chns-two run-parallel gif-chns gif-chns-two mp4-chns mp4-chns-two help
 
 clean:
 	@setopt nullglob; \
@@ -37,6 +37,12 @@ gif-chns:
 gif-chns-two:
 	./make_chns_gif two_bubbles
 
+mp4-chns:
+	./make_chns_mp4 single_bubble
+
+mp4-chns-two:
+	./make_chns_mp4 two_bubbles
+
 help:
 	@echo "Usage: make [target]"
 	@echo ""
@@ -50,5 +56,7 @@ help:
 	@echo "  run-parallel  Run the experimental MPI CHNS variant"
 	@echo "  gif-chns      Build a GIF from canonical single-bubble snapshots"
 	@echo "  gif-chns-two  Build a GIF from canonical two-bubble snapshots"
+	@echo "  mp4-chns      Build an MP4 from canonical single-bubble snapshots"
+	@echo "  mp4-chns-two  Build an MP4 from canonical two-bubble snapshots"
 	@echo "  clean         Remove LaTeX auxiliary files from output/"
 	@echo "  help          Show this help message"

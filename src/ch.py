@@ -207,6 +207,11 @@ class CahnHilliard:
         )
 
         snapshots = deque([0, 0.5, 1., 1.5, 2, 2.5, 3, 4])
+        t = 0.0
+
+        self.file.write(*w.subfunctions, time=t)
+        while snapshots and abs(snapshots[0] - t) <= 0.5 * dt:
+            self.plot(w.subfunctions[0], time=snapshots.popleft())
 
         with tqdm(
             total=total_time,
@@ -216,11 +221,11 @@ class CahnHilliard:
             disable=not self.is_root,
             bar_format="{l_bar}{bar}| {n:.0e}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
         ) as pbar:
-            t = 0.0
-            
             for step in range(n):
                 solver.solve()
                 w_.assign(w)
+
+                t += dt
 
                 self.file.write(*w.subfunctions, time=t)
 
@@ -233,16 +238,12 @@ class CahnHilliard:
                 if converged_reason < 0 and self.is_root:
                     tqdm.write(f"Warning: Solver failed to converge at step {step}, t={t:.0e} (Reason: {converged_reason})")
 
-                t += dt
-
                 if self.is_root:
                     pbar.update(dt)
                     pbar.set_postfix_str(f"t={t:.0e}")
 
-                for time in snapshots:
-                    if time - dt/2 < t < time + dt/2:
-                        self.plot(w.subfunctions[0], time=time)
-                        snapshots.popleft(); break
+                while snapshots and abs(snapshots[0] - t) <= 0.5 * dt:
+                    self.plot(w.subfunctions[0], time=snapshots.popleft())
 
         # maybe return something about convergence
         # return self
@@ -330,14 +331,15 @@ class CahnHilliardParallel:
         return self.potential(phase) + 1e-3
 
     def mass(self, phase):
-        return fd.assemble(self.density(phase) * fd.dx)
+        return fd.assemble(phase * fd.dx)
 
     def center_of_mass(self, phase):
         x = fd.SpatialCoordinate(self.mesh)
-        return [
-            fd.assemble(self.density(phase) * x[i] * fd.dx) / self.mass(phase)
-            for i in range(len(x))
-        ]
+        mass = self.mass(phase)
+        if abs(mass) <= 1e-12:
+            return [0.0 for _ in range(len(x))]
+
+        return [fd.assemble(phase * x[i] * fd.dx) / mass for i in range(len(x))]
 
     @cached_property
     def initial_phase(self):
@@ -420,6 +422,8 @@ class CahnHilliardParallel:
             solver.solve()
             w_.assign(w)
 
+            t += dt
+
             self.file.write(*w.subfunctions, time=t)
 
             snes = solver.snes
@@ -428,8 +432,6 @@ class CahnHilliardParallel:
 
             if converged_reason < 0 and rank == 0:
                 tqdm.write(f"Warning: Solver failed to converge at step {step}, t={t:.0e} (Reason: {converged_reason})")
-
-            t += dt
 
             if rank == 0:
                 pbar.update(dt)

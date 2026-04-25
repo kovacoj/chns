@@ -291,6 +291,8 @@ class CahnHilliardNavierStokes:
                 solver.solve()
                 w_.assign(w)
 
+                t += dt
+
                 self.file.write(*w.subfunctions, time=t)
 
                 # Get solver convergence information
@@ -301,8 +303,6 @@ class CahnHilliardNavierStokes:
                 # Check for solver convergence issues
                 if converged_reason < 0:
                     tqdm.write(f"Warning: Solver failed to converge at step {step}, t={t:.0e} (Reason: {converged_reason})")
-
-                t += dt
 
                 pbar.update(dt)
                 pbar.set_postfix_str(f"t={t:.0e}")

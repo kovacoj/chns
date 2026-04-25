@@ -118,15 +118,15 @@ class CahnHilliardNavierStokes:
         return self.nu2 * phase + self.nu1 * (1.0 - phase)
    
     def mass(self, phase):
-        return fd.assemble(self.density(phase) * fd.dx)
+        return fd.assemble(phase * fd.dx)
 
     def center_of_mass(self, phase):
-        x = fd.SpatialCoordinate(self.mesh)        
+        x = fd.SpatialCoordinate(self.mesh)
+        mass = self.mass(phase)
+        if abs(mass) <= 1e-12:
+            return [0.0 for _ in range(len(x))]
 
-        return [
-            fd.assemble(self.density(phase) * x[i] * fd.dx) / self.mass(phase)
-            for i in range(len(x))
-        ]
+        return [fd.assemble(phase * x[i] * fd.dx) / mass for i in range(len(x))]
 
     def energy(self, w):
         u, p, phi, mu = w.split()
