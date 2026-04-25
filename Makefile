@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-.PHONY: clean build run run-gui run-ch run-chns run-chns-two run-parallel gif-chns gif-chns-two mp4-chns mp4-chns-two help
+.PHONY: clean build run run-gui run-ac run-ch run-chns run-chns-two run-parallel gif-chns gif-chns-two mp4-ac-circle mp4-ac-random mp4-chns mp4-chns-two help
 
 clean:
 	@setopt nullglob; \
@@ -18,6 +18,9 @@ run:
 
 run-gui:
 	bash ./run_firedrake_container bash
+
+run-ac:
+	bash ./run_firedrake_container mpiexec -n 4 python3 src/allen_cahn.py --initial circle
 
 run-ch:
 	bash ./run_firedrake_container python3 src/ch.py
@@ -37,6 +40,12 @@ gif-chns:
 gif-chns-two:
 	./make_chns_gif two_bubbles
 
+mp4-ac-circle:
+	./make_allen_cahn_mp4 circle
+
+mp4-ac-random:
+	./make_allen_cahn_mp4 random
+
 mp4-chns:
 	./make_chns_mp4 single_bubble
 
@@ -50,12 +59,15 @@ help:
 	@echo "  build         Pull the supported Firedrake image"
 	@echo "  run           Open an interactive Firedrake shell"
 	@echo "  run-gui       Alias for 'run' (the helper already wires X11 mounts)"
+	@echo "  run-ac        Run the periodic Allen-Cahn benchmark"
 	@echo "  run-ch        Run the periodic Cahn-Hilliard benchmark"
 	@echo "  run-chns      Run the canonical single-bubble CHNS benchmark"
 	@echo "  run-chns-two  Run the canonical two-bubble CHNS benchmark"
 	@echo "  run-parallel  Run the experimental MPI CHNS variant"
 	@echo "  gif-chns      Build a GIF from canonical single-bubble snapshots"
 	@echo "  gif-chns-two  Build a GIF from canonical two-bubble snapshots"
+	@echo "  mp4-ac-circle Build an MP4 from Allen-Cahn circle snapshots"
+	@echo "  mp4-ac-random Build an MP4 from Allen-Cahn random snapshots"
 	@echo "  mp4-chns      Build an MP4 from canonical single-bubble snapshots"
 	@echo "  mp4-chns-two  Build an MP4 from canonical two-bubble snapshots"
 	@echo "  clean         Remove LaTeX auxiliary files from output/"
