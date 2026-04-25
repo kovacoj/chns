@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 def _parse_main_args(argv):
     parser = argparse.ArgumentParser(description="Run the canonical CHNS rising-bubble benchmark.")
-    parser.add_argument("--benchmark", choices=("single_bubble", "two_bubbles"), default="single_bubble")
+    parser.add_argument("--benchmark", choices=("single_bubble", "two_bubbles", "many_bubbles"), default="single_bubble")
     parser.add_argument("--nx", type=int, default=20)
     parser.add_argument("--ny", type=int, default=60)
     parser.add_argument("--dt", type=float, default=1e-3)
@@ -26,6 +26,7 @@ else:
 
 from tqdm import tqdm
 import firedrake as fd
+from firedrake.exceptions import ConvergenceError
 from firedrake.pyplot import tricontourf
 from firedrake.utility_meshes import RectangleMesh
 from firedrake.output import VTKFile
@@ -272,6 +273,11 @@ class CahnHilliardNavierStokes:
         elif self.benchmark == "two_bubbles":
             radius = 0.14
             centers = ((0.5, 0.65), (0.5, 1.05))
+        elif self.benchmark == "many_bubbles":
+            radius = 0.07
+            x_coords = (0.2, 0.35, 0.5, 0.65, 0.8)
+            y_coords = (0.35, 0.55, 0.75, 0.95)
+            centers = tuple((x, y) for y in y_coords for x in x_coords)
         else:
             raise ValueError(f"Unsupported benchmark: {self.benchmark}")
 
@@ -283,7 +289,7 @@ class CahnHilliardNavierStokes:
         for center_x, center_y in centers:
             distance = fd.sqrt((coordinates[0] - center_x)**2 + (coordinates[1] - center_y)**2 + 1e-12)
             bubble = 0.5 * (1.0 - fd.tanh((distance - radius) / interface_width))
-            initial_phase = initial_phase + bubble
+            initial_phase = 1.0 - (1.0 - initial_phase) * (1.0 - bubble)
 
         return fd.Function(self.FunctionSpace[2]).interpolate(initial_phase)
 
@@ -398,18 +404,27 @@ class CahnHilliardNavierStokes:
             bar_format="{l_bar}{bar}| {n:.0e}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
         ) as pbar:
             for step in range(1, n + 1):
-                solver.solve()
-                w_.assign(w)
+                solve_failed = False
+                try:
+                    solver.solve()
+                except ConvergenceError:
+                    solve_failed = True
 
                 t = step * dt
 
-                velocity_fn, _, phase_fn, _ = w.subfunctions
+                if not solve_failed:
+                    w_.assign(w)
+                    state_fn = w
+                else:
+                    state_fn = w_
+
+                velocity_fn, _, phase_fn, _ = state_fn.subfunctions
                 diagnostics = self.collect_diagnostics(velocity_fn, phase_fn)
 
-                if self.file is not None and step % self.output_every == 0:
+                if self.file is not None and step % self.output_every == 0 and not solve_failed:
                     self.file.write(*w.subfunctions, time=t)
 
-                while pending_snapshots and abs(t - pending_snapshots[0]) <= 0.5 * dt:
+                while pending_snapshots and abs(t - pending_snapshots[0]) <= 0.5 * dt and not solve_failed:
                     self.plot_phase_snapshot(phase_fn, pending_snapshots.pop(0))
 
                 snes = solver.snes

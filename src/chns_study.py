@@ -10,7 +10,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Run a mesh/timestep sweep for the canonical CHNS rising-bubble benchmark."
     )
-    parser.add_argument("--benchmark", choices=("single_bubble", "two_bubbles"), default="single_bubble")
+    parser.add_argument("--benchmark", choices=("single_bubble", "two_bubbles", "many_bubbles"), default="single_bubble")
     parser.add_argument(
         "--meshes",
         nargs="+",
@@ -38,13 +38,16 @@ def parse_mesh(spec):
 
 def summarize_history(history, benchmark, nx, ny, dt, steps):
     final = history[-1]
+    completed_steps = max((entry["step"] for entry in history if entry["reason"] >= 0), default=0)
+    failure_step = final["step"] if final["reason"] < 0 else None
     return {
         "benchmark": benchmark,
         "nx": nx,
         "ny": ny,
         "dt": dt,
         "requested_steps": steps,
-        "completed_steps": final["step"],
+        "completed_steps": completed_steps,
+        "failure_step": failure_step,
         "final_time": final["time"],
         "final_reason": final["reason"],
         "phase_mass": final["phase_mass"],
@@ -53,7 +56,7 @@ def summarize_history(history, benchmark, nx, ny, dt, steps):
         "div_l2": final["div_l2"],
         "com_y": final["com_y"],
         "max_iterations": max(entry["iterations"] for entry in history),
-        "stable": final["reason"] >= 0 and final["step"] == steps,
+        "stable": final["reason"] >= 0 and completed_steps == steps,
     }
 
 
