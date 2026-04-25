@@ -16,7 +16,7 @@ from functools import cached_property
 
 class CahnHilliardNavierStokes:
     def __init__(self):
-        self.file = fd.VTKFile("output/bubbles.pvd")
+        self.file = fd.VTKFile("output/square-many_bubbles.pvd")
         self.theta = 1 # time-evolution param
 
         self.rho1, self.rho2 = 10, 1

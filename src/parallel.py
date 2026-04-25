@@ -8,6 +8,9 @@ import numpy as np
 from utils import refine_bary
 from functools import cached_property
 
+# Experimental MPI-oriented CHNS variant; use `src/chns.py` as the canonical
+# solver when making formulation or benchmark changes.
+
 class CahnHilliardNavierStokes:
     def __init__(self):
         self.file = VTKFile("output/parallel.pvd", "w")
