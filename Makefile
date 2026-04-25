@@ -1,43 +1,46 @@
 SHELL := /bin/zsh
 
+.PHONY: clean build run run-gui run-ch run-chns run-chns-two run-parallel help
+
 clean:
 	@setopt nullglob; \
 	for dir in output; do \
 		rm -f $$dir/*.{out,log,fls,blg,fdb_latexmk,aux,bbl,bcf,run.xml,synctex.gz}; \
 	done
 
-# Variables
-IMAGE_NAME = firedrake-zsh
-CONTAINER_NAME = firedrake-container
-SHARED_DIR = $(shell pwd)/shared
+FIREDRAKE_IMAGE = firedrakeproject/firedrake:2025.4.2
 
-# Build the Docker image
 build:
-	docker build -t $(IMAGE_NAME) .
+	docker pull $(FIREDRAKE_IMAGE)
 
-# Run the Docker container interactively
 run:
-	docker run -it --rm \
-		--name $(CONTAINER_NAME) \
-		-v $(SHARED_DIR):/home/firedrake/shared \
-		$(IMAGE_NAME)
+	bash ./run_firedrake_container bash
 
-# Run the Docker container with X11 forwarding (for GUI applications)
 run-gui:
-	docker run -it --rm \
-		--name $(CONTAINER_NAME) \
-		-v $(SHARED_DIR):/home/firedrake/shared \
-		-e DISPLAY=$(DISPLAY) \
-		-v /tmp/.X11-unix:/tmp/.X11-unix \
-		$(IMAGE_NAME)
+	bash ./run_firedrake_container bash
 
-# Help message
+run-ch:
+	bash ./run_firedrake_container python3 src/ch.py
+
+run-chns:
+	bash ./run_firedrake_container python3 src/chns.py --benchmark single_bubble
+
+run-chns-two:
+	bash ./run_firedrake_container python3 src/chns.py --benchmark two_bubbles
+
+run-parallel:
+	bash ./run_firedrake_container mpiexec -n 2 python3 src/parallel.py
+
 help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  build      Build the Docker image"
-	@echo "  run        Run the Docker container interactively"
-	@echo "  run-gui    Run the Docker container with X11 forwarding (for GUI applications)"
-	@echo "  clean      Remove the Docker image"
-	@echo "  help       Show this help message"
+	@echo "  build         Pull the supported Firedrake image"
+	@echo "  run           Open an interactive Firedrake shell"
+	@echo "  run-gui       Alias for 'run' (the helper already wires X11 mounts)"
+	@echo "  run-ch        Run the periodic Cahn-Hilliard benchmark"
+	@echo "  run-chns      Run the canonical single-bubble CHNS benchmark"
+	@echo "  run-chns-two  Run the canonical two-bubble CHNS benchmark"
+	@echo "  run-parallel  Run the experimental MPI CHNS variant"
+	@echo "  clean         Remove LaTeX auxiliary files from output/"
+	@echo "  help          Show this help message"
