@@ -14,6 +14,7 @@ def _parse_main_args(argv):
     parser.add_argument("--output-every", type=int, default=20)
     parser.add_argument("--no-output", action="store_true")
     parser.add_argument("--snapshot-times", nargs="*", type=float, default=())
+    parser.add_argument("--snapshot-every", type=float, default=None)
     return parser.parse_known_args(argv)
 
 
@@ -440,7 +441,23 @@ class CahnHilliardNavierStokes:
                         f"t={t:.2e} phi=[{diagnostics['phi_min']:.2e}, {diagnostics['phi_max']:.2e}] com_y={diagnostics['com_y']:.2e}"
                     )
         return history
+
+
+def build_snapshot_times(total_time, explicit_times=(), every=None):
+    snapshot_times = list(explicit_times)
+    if every is not None and every > 0:
+        count = int(total_time / every)
+        snapshot_times.extend(every * step for step in range(1, count + 1))
+
+    unique_times = []
+    for time in sorted(snapshot_times):
+        if 0.0 <= time <= total_time and (not unique_times or abs(time - unique_times[-1]) > 1e-12):
+            unique_times.append(time)
+    return tuple(unique_times)
+
+
 if __name__ == '__main__':
+    total_time = CLI_ARGS.dt * CLI_ARGS.steps
     model = CahnHilliardNavierStokes(
         benchmark=CLI_ARGS.benchmark,
         nx=CLI_ARGS.nx,
@@ -449,7 +466,7 @@ if __name__ == '__main__':
         steps=CLI_ARGS.steps,
         output_every=CLI_ARGS.output_every,
         write_output=not CLI_ARGS.no_output,
-        snapshot_times=CLI_ARGS.snapshot_times,
+        snapshot_times=build_snapshot_times(total_time, CLI_ARGS.snapshot_times, CLI_ARGS.snapshot_every),
     )
 
     if model.is_root:

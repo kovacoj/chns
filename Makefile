@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-.PHONY: clean build run run-gui run-ch run-chns run-chns-two run-parallel help
+.PHONY: clean build run run-gui run-ch run-chns run-chns-two run-parallel gif-chns gif-chns-two help
 
 clean:
 	@setopt nullglob; \
@@ -31,6 +31,12 @@ run-chns-two:
 run-parallel:
 	bash ./run_firedrake_container mpiexec -n 2 python3 src/parallel.py
 
+gif-chns:
+	./make_chns_gif single_bubble
+
+gif-chns-two:
+	./make_chns_gif two_bubbles
+
 help:
 	@echo "Usage: make [target]"
 	@echo ""
@@ -42,5 +48,7 @@ help:
 	@echo "  run-chns      Run the canonical single-bubble CHNS benchmark"
 	@echo "  run-chns-two  Run the canonical two-bubble CHNS benchmark"
 	@echo "  run-parallel  Run the experimental MPI CHNS variant"
+	@echo "  gif-chns      Build a GIF from canonical single-bubble snapshots"
+	@echo "  gif-chns-two  Build a GIF from canonical two-bubble snapshots"
 	@echo "  clean         Remove LaTeX auxiliary files from output/"
 	@echo "  help          Show this help message"
