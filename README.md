@@ -19,6 +19,17 @@ Use the Firedrake helper script from the repo root:
 
 Examples in this README assume you are running from the repo root through that helper.
 
+For MPI runs, inspect the visible CPU topology before starting a solver:
+
+```bash
+./run_firedrake_container lscpu
+./run_firedrake_container mpiexec -n 4 python3 src/chns.py --benchmark single_bubble
+
+./run_firedrake_container mpiexec --use-hwthread-cpus -n 8 python3 src/chns.py --benchmark single_bubble
+```
+
+Open MPI counts physical cores by default when assigning slots. If you need more ranks than visible physical cores but the container exposes enough hardware threads, add `--use-hwthread-cpus`. `--oversubscribe` is only useful for correctness checks, not a real parallel run.
+
 `make build` / `make run` are currently stale and should not be treated as the supported workflow.
 
 ## Canonical Runs

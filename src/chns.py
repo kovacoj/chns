@@ -24,6 +24,7 @@ import firedrake as fd
 from firedrake.utility_meshes import RectangleMesh
 from firedrake.output import VTKFile
 from functools import cached_property
+from mpi4py import MPI
 
 
 class CahnHilliardNavierStokes:
@@ -80,6 +81,16 @@ class CahnHilliardNavierStokes:
 
 
     def __str__(self):
+        mesh_lines = [
+            f"                - Cells: {self.global_num_cells}",
+            f"                - Cell Diameter: {self.cell_size:.4f}",
+        ]
+        if self.comm.size == 1:
+            mesh_lines.insert(1, f"                - Vertices: {self.mesh.num_vertices()}")
+        else:
+            mesh_lines.insert(1, f"                - MPI ranks: {self.comm.size}")
+        mesh_summary = "\n".join(mesh_lines)
+
         return f'''
             Cahn-Hilliard Navier-Stokes Model:
             · Benchmark = {self.benchmark}
@@ -96,10 +107,20 @@ class CahnHilliardNavierStokes:
                 - dt = {self.dt}, steps = {self.n_steps}
                 - write_output = {self.write_output}
             · Mesh:
-                - Cells: {self.mesh.num_cells()}
-                - Vertices: {self.mesh.num_vertices()}
-                - Cell Diameter: {self.cell_size:.4f}
+{mesh_summary}
         '''
+
+    @property
+    def comm(self):
+        return self.mesh.comm
+
+    @property
+    def is_root(self):
+        return self.comm.rank == 0
+
+    @cached_property
+    def global_num_cells(self):
+        return self.comm.allreduce(self.mesh.num_cells(), op=MPI.SUM)
 
     @cached_property
     def cell_size(self):
@@ -107,8 +128,9 @@ class CahnHilliardNavierStokes:
         cell_diameter = fd.CellSize(self.mesh)
         h = fd.Function(fd.FunctionSpace(self.mesh, 'DG', 0))
         h.interpolate(cell_diameter)
-        
-        return h.dat.data_ro.max()
+
+        local_max = h.dat.data_ro.max() if h.dat.data_ro.size else 0.0
+        return self.comm.allreduce(local_max, op=MPI.MAX)
 
     @cached_property
     def mesh(self):
@@ -173,7 +195,12 @@ class CahnHilliardNavierStokes:
 
     def phase_bounds(self, phase):
         values = phase.dat.data_ro
-        return values.min(), values.max()
+        local_min = values.min() if values.size else float("inf")
+        local_max = values.max() if values.size else -float("inf")
+        return (
+            self.comm.allreduce(local_min, op=MPI.MIN),
+            self.comm.allreduce(local_max, op=MPI.MAX),
+        )
 
     def divergence_metric(self, velocity):
         return fd.assemble(fd.div(velocity) * fd.div(velocity) * fd.dx) ** 0.5
@@ -334,7 +361,13 @@ class CahnHilliardNavierStokes:
         history.append({"step": 0, "time": 0.0, "iterations": 0, "reason": 0, **initial_diagnostics})
 
         with tqdm(
-            total=total_time, desc="Time Evolution", unit="s", dynamic_ncols=True, bar_format="{l_bar}{bar}| {n:.0e}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]") as pbar:
+            total=total_time,
+            desc="Time Evolution",
+            unit="s",
+            dynamic_ncols=True,
+            disable=not self.is_root,
+            bar_format="{l_bar}{bar}| {n:.0e}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
+        ) as pbar:
             for step in range(1, n + 1):
                 solver.solve()
                 w_.assign(w)
@@ -359,7 +392,7 @@ class CahnHilliardNavierStokes:
                     **diagnostics,
                 })
 
-                if step % self.output_every == 0 or converged_reason < 0:
+                if self.is_root and (step % self.output_every == 0 or converged_reason < 0):
                     tqdm.write(
                         f"step={step:04d} t={t:.3e} its={iterations:02d} "
                         f"phi=[{diagnostics['phi_min']:.3e}, {diagnostics['phi_max']:.3e}] "
@@ -370,10 +403,11 @@ class CahnHilliardNavierStokes:
                 if converged_reason < 0:
                     break
 
-                pbar.update(t - pbar.n)
-                pbar.set_postfix_str(
-                    f"t={t:.2e} phi=[{diagnostics['phi_min']:.2e}, {diagnostics['phi_max']:.2e}] com_y={diagnostics['com_y']:.2e}"
-                )
+                if self.is_root:
+                    pbar.update(t - pbar.n)
+                    pbar.set_postfix_str(
+                        f"t={t:.2e} phi=[{diagnostics['phi_min']:.2e}, {diagnostics['phi_max']:.2e}] com_y={diagnostics['com_y']:.2e}"
+                    )
         return history
 if __name__ == '__main__':
     model = CahnHilliardNavierStokes(
@@ -386,6 +420,7 @@ if __name__ == '__main__':
         write_output=not CLI_ARGS.no_output,
     )
 
-    print(model)
+    if model.is_root:
+        print(model)
 
     model.run()

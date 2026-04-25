@@ -64,14 +64,23 @@ class CahnHilliard:
                 - Cell Diameter: {self.cell_size:.4f}
         '''
 
+    @property
+    def comm(self):
+        return self.mesh.comm
+
+    @property
+    def is_root(self):
+        return self.comm.rank == 0
+
     @cached_property
     def cell_size(self):
         # calculate the cell diameter
         cell_diameter = fd.CellSize(self.mesh)
         h = fd.Function(fd.FunctionSpace(self.mesh, 'DG', 0))
         h.interpolate(cell_diameter)
-        
-        return h.dat.data_ro.max()
+
+        local_max = h.dat.data_ro.max() if h.dat.data_ro.size else 0.0
+        return self.comm.allreduce(local_max, op=MPI.MAX)
 
     @cached_property
     def mesh(self):
@@ -100,15 +109,15 @@ class CahnHilliard:
         return self.potential(phase) + 1e-3
 
     def mass(self, phase):
-        return fd.assemble(self.density(phase) * fd.dx)
+        return fd.assemble(phase * fd.dx)
 
     def center_of_mass(self, phase):
-        x = fd.SpatialCoordinate(self.mesh)        
+        x = fd.SpatialCoordinate(self.mesh)
+        mass = self.mass(phase)
+        if abs(mass) <= 1e-12:
+            return [0.0 for _ in range(len(x))]
 
-        return [
-            fd.assemble(self.density(phase) * x[i] * fd.dx) / self.mass(phase)
-            for i in range(len(x))
-        ]
+        return [fd.assemble(phase * x[i] * fd.dx) / mass for i in range(len(x))]
 
     @cached_property
     def initial_phase(self):
@@ -147,6 +156,9 @@ class CahnHilliard:
             func.interpolate(initial_conditions[name])
 
     def plot(self, fn, time):
+        if self.comm.size > 1:
+            return
+
         fig, axes = plt.subplots()
         levels = np.linspace(fn.dat.data.min(), fn.dat.data.max(), 200)
 
@@ -197,7 +209,13 @@ class CahnHilliard:
         snapshots = deque([0, 0.5, 1., 1.5, 2, 2.5, 3, 4])
 
         with tqdm(
-            total=total_time, desc="Time Evolution", unit="s", dynamic_ncols=True, bar_format="{l_bar}{bar}| {n:.0e}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]") as pbar:
+            total=total_time,
+            desc="Time Evolution",
+            unit="s",
+            dynamic_ncols=True,
+            disable=not self.is_root,
+            bar_format="{l_bar}{bar}| {n:.0e}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]",
+        ) as pbar:
             t = 0.0
             
             for step in range(n):
@@ -212,13 +230,14 @@ class CahnHilliard:
                 converged_reason = snes.getConvergedReason()
 
                 # Check for solver convergence issues
-                if converged_reason < 0:
+                if converged_reason < 0 and self.is_root:
                     tqdm.write(f"Warning: Solver failed to converge at step {step}, t={t:.0e} (Reason: {converged_reason})")
 
                 t += dt
 
-                pbar.update(dt)
-                pbar.set_postfix_str(f"t={t:.0e}")
+                if self.is_root:
+                    pbar.update(dt)
+                    pbar.set_postfix_str(f"t={t:.0e}")
 
                 for time in snapshots:
                     if time - dt/2 < t < time + dt/2:
