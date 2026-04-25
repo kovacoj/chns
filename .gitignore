@@ -1,8 +1,10 @@
-
-# output/
 __pycache__/
-# report/graphics/
+.cache/
 
+# Keep only the tracked compiled report PDFs in output/.
+output/*
+!output/ch.pdf
+!output/chns.pdf
 
 .bash_history
 .python_history
