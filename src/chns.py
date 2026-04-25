@@ -236,7 +236,9 @@ class CahnHilliardNavierStokes:
         axes.set_yticks([])
         for collection in axes.collections:
             collection.set_edgecolor("face")
-        fig.savefig(f"output/chns-{self.benchmark}-t{time:g}.png", bbox_inches="tight")
+        base_path = f"output/chns-{self.benchmark}-t{time:g}"
+        fig.savefig(f"{base_path}.png", bbox_inches="tight")
+        fig.savefig(f"{base_path}.pdf", bbox_inches="tight")
         plt.close(fig)
 
     def energy(self, w):
