@@ -335,13 +335,11 @@ class CahnHilliardNavierStokes:
 
         with tqdm(
             total=total_time, desc="Time Evolution", unit="s", dynamic_ncols=True, bar_format="{l_bar}{bar}| {n:.0e}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]") as pbar:
-            t = 0.0
-
             for step in range(1, n + 1):
                 solver.solve()
                 w_.assign(w)
 
-                t += dt
+                t = step * dt
 
                 velocity_fn, _, phase_fn, _ = w.subfunctions
                 diagnostics = self.collect_diagnostics(velocity_fn, phase_fn)
@@ -372,7 +370,7 @@ class CahnHilliardNavierStokes:
                 if converged_reason < 0:
                     break
 
-                pbar.update(dt)
+                pbar.update(t - pbar.n)
                 pbar.set_postfix_str(
                     f"t={t:.2e} phi=[{diagnostics['phi_min']:.2e}, {diagnostics['phi_max']:.2e}] com_y={diagnostics['com_y']:.2e}"
                 )

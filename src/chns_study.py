@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 from itertools import product
 from pathlib import Path
 
@@ -55,6 +56,7 @@ def summarize_history(history, benchmark, nx, ny, dt, steps):
 
 def main():
     args = parse_args()
+    sys.argv = [sys.argv[0]]
     from chns import CahnHilliardNavierStokes
 
     results = []
