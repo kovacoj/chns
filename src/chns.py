@@ -1,15 +1,23 @@
 import argparse
 import sys
 
-CLI_PARSER = argparse.ArgumentParser(description="Run the canonical CHNS rising-bubble benchmark.")
-CLI_PARSER.add_argument("--benchmark", choices=("single_bubble", "two_bubbles"), default="single_bubble")
-CLI_PARSER.add_argument("--nx", type=int, default=20)
-CLI_PARSER.add_argument("--ny", type=int, default=60)
-CLI_PARSER.add_argument("--dt", type=float, default=1e-3)
-CLI_PARSER.add_argument("--steps", type=int, default=1000)
-CLI_PARSER.add_argument("--output-every", type=int, default=20)
-CLI_ARGS, REMAINING_ARGV = CLI_PARSER.parse_known_args()
-sys.argv = [sys.argv[0], *REMAINING_ARGV]
+def _parse_main_args(argv):
+    parser = argparse.ArgumentParser(description="Run the canonical CHNS rising-bubble benchmark.")
+    parser.add_argument("--benchmark", choices=("single_bubble", "two_bubbles"), default="single_bubble")
+    parser.add_argument("--nx", type=int, default=20)
+    parser.add_argument("--ny", type=int, default=60)
+    parser.add_argument("--dt", type=float, default=1e-3)
+    parser.add_argument("--steps", type=int, default=1000)
+    parser.add_argument("--output-every", type=int, default=20)
+    parser.add_argument("--no-output", action="store_true")
+    return parser.parse_known_args(argv)
+
+
+if __name__ == '__main__':
+    CLI_ARGS, REMAINING_ARGV = _parse_main_args(sys.argv[1:])
+    sys.argv = [sys.argv[0], *REMAINING_ARGV]
+else:
+    CLI_ARGS = None
 
 from tqdm import tqdm
 import firedrake as fd
@@ -19,15 +27,16 @@ from functools import cached_property
 
 
 class CahnHilliardNavierStokes:
-    def __init__(self, benchmark="single_bubble", nx=20, ny=60, dt=1e-3, steps=1000, output_every=20):
+    def __init__(self, benchmark="single_bubble", nx=20, ny=60, dt=1e-3, steps=1000, output_every=20, write_output=True):
         self.benchmark = benchmark
         self.nx = nx
         self.ny = ny
         self.dt = dt
         self.n_steps = steps
         self.output_every = output_every
+        self.write_output = write_output
 
-        self.file = fd.VTKFile(f"output/chns-{benchmark}.pvd")
+        self.file = fd.VTKFile(f"output/chns-{benchmark}.pvd") if write_output else None
         self.theta = 1.0  # Backward Euler default for the canonical benchmark.
 
         self.rho1, self.rho2 = 10, 1
@@ -85,6 +94,7 @@ class CahnHilliardNavierStokes:
                 - Mobility: m0 = {self.m0}
                 - σ = {self.sigma}, ε = {self.epsilon}
                 - dt = {self.dt}, steps = {self.n_steps}
+                - write_output = {self.write_output}
             · Mesh:
                 - Cells: {self.mesh.num_cells()}
                 - Vertices: {self.mesh.num_vertices()}
@@ -319,7 +329,8 @@ class CahnHilliardNavierStokes:
         history = []
         velocity_fn, _, phase_fn, _ = w.subfunctions
         initial_diagnostics = self.collect_diagnostics(velocity_fn, phase_fn)
-        self.file.write(*w.subfunctions, time=0.0)
+        if self.file is not None:
+            self.file.write(*w.subfunctions, time=0.0)
         history.append({"step": 0, "time": 0.0, "iterations": 0, "reason": 0, **initial_diagnostics})
 
         with tqdm(
@@ -335,7 +346,7 @@ class CahnHilliardNavierStokes:
                 velocity_fn, _, phase_fn, _ = w.subfunctions
                 diagnostics = self.collect_diagnostics(velocity_fn, phase_fn)
 
-                if step % self.output_every == 0:
+                if self.file is not None and step % self.output_every == 0:
                     self.file.write(*w.subfunctions, time=t)
 
                 snes = solver.snes
@@ -374,6 +385,7 @@ if __name__ == '__main__':
         dt=CLI_ARGS.dt,
         steps=CLI_ARGS.steps,
         output_every=CLI_ARGS.output_every,
+        write_output=not CLI_ARGS.no_output,
     )
 
     print(model)
