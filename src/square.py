@@ -170,12 +170,13 @@ class CahnHilliardNavierStokes:
     def initial_phase(self):
         coordinates = fd.SpatialCoordinate(self.mesh)
 
-        mesh_coords = self.mesh.coordinates.dat.data_ro
-        domain_size = np.ptp(mesh_coords, axis=0)
+        # Use a fixed global-domain RNG so runs stay comparable across MPI sizes.
+        domain_size = np.array((4.0, 8.0))
 
         radius = 0.1
         n_bubbles = 42
-        centers = np.random.rand(n_bubbles, len(domain_size)) * domain_size
+        rng = np.random.default_rng(0)
+        centers = rng.random((n_bubbles, len(domain_size))) * domain_size
 
         # centers = np.array([[0.4, 0.3], [0.6, 0.8]])
         # radius = 0.2
