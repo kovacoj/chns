@@ -49,6 +49,7 @@ Useful CHNS overrides:
 
 ## Other Solver Files
 
+- Only `src/chns.py` should be treated as the canonical CHNS solver for new numerical work.
 - `src/ch.py`: periodic CH reference problem.
 - `src/chns.py`: canonical CHNS rising-bubble benchmark.
 - `src/parallel.py`: experimental parallel CHNS variant.
