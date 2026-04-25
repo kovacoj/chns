@@ -1,6 +1,9 @@
 import argparse
 import sys
 
+import numpy as np
+import matplotlib.pyplot as plt
+
 def _parse_main_args(argv):
     parser = argparse.ArgumentParser(description="Run the canonical CHNS rising-bubble benchmark.")
     parser.add_argument("--benchmark", choices=("single_bubble", "two_bubbles"), default="single_bubble")
@@ -10,6 +13,7 @@ def _parse_main_args(argv):
     parser.add_argument("--steps", type=int, default=1000)
     parser.add_argument("--output-every", type=int, default=20)
     parser.add_argument("--no-output", action="store_true")
+    parser.add_argument("--snapshot-times", nargs="*", type=float, default=())
     return parser.parse_known_args(argv)
 
 
@@ -21,6 +25,7 @@ else:
 
 from tqdm import tqdm
 import firedrake as fd
+from firedrake.pyplot import tricontourf
 from firedrake.utility_meshes import RectangleMesh
 from firedrake.output import VTKFile
 from functools import cached_property
@@ -28,7 +33,7 @@ from mpi4py import MPI
 
 
 class CahnHilliardNavierStokes:
-    def __init__(self, benchmark="single_bubble", nx=20, ny=60, dt=1e-3, steps=1000, output_every=20, write_output=True):
+    def __init__(self, benchmark="single_bubble", nx=20, ny=60, dt=1e-3, steps=1000, output_every=20, write_output=True, snapshot_times=()):
         self.benchmark = benchmark
         self.nx = nx
         self.ny = ny
@@ -36,6 +41,7 @@ class CahnHilliardNavierStokes:
         self.n_steps = steps
         self.output_every = output_every
         self.write_output = write_output
+        self.snapshot_times = tuple(snapshot_times)
 
         self.file = fd.VTKFile(f"output/chns-{benchmark}.pvd") if write_output else None
         self.theta = 1.0  # Backward Euler default for the canonical benchmark.
@@ -106,6 +112,7 @@ class CahnHilliardNavierStokes:
                 - σ = {self.sigma}, ε = {self.epsilon}
                 - dt = {self.dt}, steps = {self.n_steps}
                 - write_output = {self.write_output}
+                - snapshot_times = {self.snapshot_times}
             · Mesh:
 {mesh_summary}
         '''
@@ -215,6 +222,22 @@ class CahnHilliardNavierStokes:
             "div_l2": self.divergence_metric(velocity),
             "com_y": center_y,
         }
+
+    def plot_phase_snapshot(self, phase, time):
+        if self.comm.size > 1 or not self.is_root:
+            return
+
+        fig, axes = plt.subplots()
+        values = phase.dat.data_ro
+        levels = np.linspace(values.min(), values.max(), 200)
+        tricontourf(phase, levels=levels, axes=axes)
+        axes.set_aspect("equal")
+        axes.set_xticks([])
+        axes.set_yticks([])
+        for collection in axes.collections:
+            collection.set_edgecolor("face")
+        fig.savefig(f"output/chns-{self.benchmark}-t{time:g}.png", bbox_inches="tight")
+        plt.close(fig)
 
     def energy(self, w):
         u, p, phi, mu = w.split()
@@ -354,10 +377,13 @@ class CahnHilliardNavierStokes:
         )
 
         history = []
+        pending_snapshots = list(self.snapshot_times)
         velocity_fn, _, phase_fn, _ = w.subfunctions
         initial_diagnostics = self.collect_diagnostics(velocity_fn, phase_fn)
         if self.file is not None:
             self.file.write(*w.subfunctions, time=0.0)
+        if pending_snapshots and pending_snapshots[0] <= 0.0:
+            self.plot_phase_snapshot(phase_fn, pending_snapshots.pop(0))
         history.append({"step": 0, "time": 0.0, "iterations": 0, "reason": 0, **initial_diagnostics})
 
         with tqdm(
@@ -379,6 +405,9 @@ class CahnHilliardNavierStokes:
 
                 if self.file is not None and step % self.output_every == 0:
                     self.file.write(*w.subfunctions, time=t)
+
+                while pending_snapshots and abs(t - pending_snapshots[0]) <= 0.5 * dt:
+                    self.plot_phase_snapshot(phase_fn, pending_snapshots.pop(0))
 
                 snes = solver.snes
                 iterations = snes.getIterationNumber()
@@ -418,6 +447,7 @@ if __name__ == '__main__':
         steps=CLI_ARGS.steps,
         output_every=CLI_ARGS.output_every,
         write_output=not CLI_ARGS.no_output,
+        snapshot_times=CLI_ARGS.snapshot_times,
     )
 
     if model.is_root:
