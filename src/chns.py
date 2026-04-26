@@ -274,10 +274,32 @@ class CahnHilliardNavierStokes:
             radius = 0.14
             centers = ((0.5, 0.65), (0.5, 1.05))
         elif self.benchmark == "many_bubbles":
-            radius = 0.07
-            x_coords = (0.2, 0.35, 0.5, 0.65, 0.8)
-            y_coords = (0.35, 0.55, 0.75, 0.95)
-            centers = tuple((x, y) for y in y_coords for x in x_coords)
+            radius = 0.055
+            rng = np.random.default_rng(7)
+            x_min, x_max = 0.12, 0.88
+            y_min, y_max = 0.30, 1.85
+            min_distance = 2.15 * radius
+            target_count = 24
+            centers = []
+            attempts = 0
+            max_attempts = 10000
+
+            while len(centers) < target_count and attempts < max_attempts:
+                attempts += 1
+                candidate = (
+                    rng.uniform(x_min, x_max),
+                    rng.uniform(y_min, y_max),
+                )
+                if all(
+                    (candidate[0] - center_x)**2 + (candidate[1] - center_y)**2 >= min_distance**2
+                    for center_x, center_y in centers
+                ):
+                    centers.append(candidate)
+
+            if len(centers) < target_count:
+                raise RuntimeError("Failed to place deterministic many-bubble layout")
+
+            centers = tuple(centers)
         else:
             raise ValueError(f"Unsupported benchmark: {self.benchmark}")
 
