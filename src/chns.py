@@ -18,8 +18,28 @@ def _parse_main_args(argv):
     return parser.parse_known_args(argv)
 
 
+def _apply_benchmark_defaults(args):
+    if args.benchmark != "many_bubbles":
+        return args
+
+    if args.nx == 20 and args.ny == 60:
+        args.nx = 60
+        args.ny = 120
+    if args.dt == 1e-3:
+        args.dt = 5e-4
+    if args.steps == 1000:
+        args.steps = 4000
+    if args.output_every == 20:
+        args.output_every = 200
+    if args.snapshot_every is None:
+        args.snapshot_every = 0.1
+
+    return args
+
+
 if __name__ == '__main__':
     CLI_ARGS, REMAINING_ARGV = _parse_main_args(sys.argv[1:])
+    CLI_ARGS = _apply_benchmark_defaults(CLI_ARGS)
     sys.argv = [sys.argv[0], *REMAINING_ARGV]
 else:
     CLI_ARGS = None
@@ -48,12 +68,21 @@ class CahnHilliardNavierStokes:
         self.file = fd.VTKFile(f"output/chns-{benchmark}.pvd") if write_output else None
         self.theta = 1.0  # Backward Euler default for the canonical benchmark.
 
+        self.domain_width = 1.0
+        self.domain_height = 3.0
+
         self.rho1, self.rho2 = 10, 1
-        self.nu1 = self.nu2 = 1 # paper says should be the same
+        self.nu1 = self.nu2 = 1.0
         self.sigma = 1e-1
         self.gravity = fd.Constant((0., -9.81))
         self.epsilon = 5e-2
         self.m0 = 1e-4
+
+        if self.benchmark == "many_bubbles":
+            self.domain_height = 2.0
+            self.nu1 = self.nu2 = 0.4
+            self.gravity = fd.Constant((0.0, -18.0))
+            self.epsilon = 4e-2
 
         self.solver_params = {
             "snes_type": "newtonls",
@@ -143,7 +172,7 @@ class CahnHilliardNavierStokes:
 
     @cached_property
     def mesh(self):
-        return RectangleMesh(self.nx, self.ny, 1.0, 3.0, quadrilateral=False)
+        return RectangleMesh(self.nx, self.ny, self.domain_width, self.domain_height, quadrilateral=False)
 
     @cached_property
     def FunctionSpace(self):
@@ -274,12 +303,12 @@ class CahnHilliardNavierStokes:
             radius = 0.14
             centers = ((0.5, 0.65), (0.5, 1.05))
         elif self.benchmark == "many_bubbles":
-            radius = 0.055
+            radius = 0.05
             rng = np.random.default_rng(7)
             x_min, x_max = 0.12, 0.88
-            y_min, y_max = 0.30, 1.85
-            min_distance = 2.15 * radius
-            target_count = 24
+            y_min, y_max = 0.22, 1.55
+            min_distance = 2.05 * radius
+            target_count = 28
             centers = []
             attempts = 0
             max_attempts = 10000
