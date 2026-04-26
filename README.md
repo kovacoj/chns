@@ -1,6 +1,6 @@
-# CHNS Experiments
+# Phase-Field Experiments
 
-Firedrake experiments for the Cahn-Hilliard (CH) and Cahn-Hilliard-Navier-Stokes (CHNS) equations.
+Firedrake experiments for the Allen-Cahn (AC), Cahn-Hilliard (CH), and Cahn-Hilliard-Navier-Stokes (CHNS) equations.
 
 The current canonical CHNS benchmark lives in `src/chns.py`, uses a Taylor-Hood velocity-pressure pair on a rectangle, and contains the rising-bubble cases used for stabilization work. Other solver files explore pressure-robust, barycentrically refined, parallel, and many-bubble variants.
 
@@ -34,6 +34,12 @@ Open MPI counts physical cores by default when assigning slots. If you need more
 
 ## Canonical Runs
 
+Periodic Allen-Cahn benchmark:
+
+```bash
+./run_firedrake_container mpiexec -n 4 python3 src/allen_cahn.py --initial circle
+```
+
 Periodic Cahn-Hilliard benchmark:
 
 ```bash
@@ -58,9 +64,17 @@ Useful CHNS overrides:
 ./run_firedrake_container python3 src/chns.py --benchmark single_bubble --nx 20 --ny 60 --dt 1e-3 --steps 1000 --output-every 20
 ```
 
+Useful Allen-Cahn overrides:
+
+```bash
+./run_firedrake_container mpiexec -n 4 python3 src/allen_cahn.py --initial random --steps 400 --snapshot-every 0.02
+./make_allen_cahn_mp4 random
+```
+
 ## Other Solver Files
 
 - Only `src/chns.py` should be treated as the canonical CHNS solver for new numerical work.
+- `src/allen_cahn.py`: periodic Allen-Cahn benchmark with circle and random initial data.
 - `src/ch.py`: periodic CH reference problem.
 - `src/chns.py`: canonical CHNS rising-bubble benchmark.
 - `src/parallel.py`: experimental parallel CHNS variant.
@@ -71,6 +85,7 @@ Do not assume the experimental variants implement the same formulation as `src/c
 
 ## Outputs
 
+- `src/allen_cahn.py` writes `output/allen_cahn-<initial>.pvd` together with optional PNG/PDF snapshots.
 - `src/ch.py` writes `output/ch.pvd` and CH snapshot PDFs.
 - `src/chns.py` writes benchmark-specific VTK outputs such as `output/chns-single_bubble.pvd`.
 - `output/ch.pdf` and `output/chns.pdf` are tracked compiled report PDFs.
@@ -78,6 +93,7 @@ Do not assume the experimental variants implement the same formulation as `src/c
 ## Reports
 
 - `report/ch.tex`: CH writeup.
+- `report/allen_cahn.tex`: Allen-Cahn writeup.
 - `report/chns.tex`: CHNS writeup.
 
 ## Current Focus
