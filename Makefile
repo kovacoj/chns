@@ -1,6 +1,6 @@
 SHELL := /bin/zsh
 
-.PHONY: clean build run run-gui run-ac run-ch run-chns run-chns-two run-parallel gif-chns gif-chns-two mp4-ac-circle mp4-ac-random mp4-chns mp4-chns-two help
+.PHONY: clean build run run-gui run-ac run-ch run-chns run-chns-two run-parallel gif-chns gif-chns-two gif-chns-many mp4-ac-circle mp4-ac-random mp4-chns mp4-chns-two help
 
 clean:
 	@setopt nullglob; \
@@ -46,6 +46,9 @@ mp4-ac-circle:
 mp4-ac-random:
 	./make_allen_cahn_mp4 random
 
+gif-chns-many:
+	./make_chns_gif many_bubbles
+
 mp4-chns:
 	./make_chns_mp4 single_bubble
 
@@ -68,6 +71,7 @@ help:
 	@echo "  gif-chns-two  Build a GIF from canonical two-bubble snapshots"
 	@echo "  mp4-ac-circle Build an MP4 from Allen-Cahn circle snapshots"
 	@echo "  mp4-ac-random Build an MP4 from Allen-Cahn random snapshots"
+	@echo "  gif-chns-many Build a GIF from canonical many-bubbles snapshots"
 	@echo "  mp4-chns      Build an MP4 from canonical single-bubble snapshots"
 	@echo "  mp4-chns-two  Build an MP4 from canonical two-bubble snapshots"
 	@echo "  clean         Remove LaTeX auxiliary files from output/"
